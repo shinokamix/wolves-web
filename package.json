@@ -18,11 +18,17 @@
     "styles": "npm --prefix apps/web run styles",
     "styles:watch": "npm --prefix apps/web run styles:watch",
     "check:web": "npm --prefix apps/web run check",
-    "check": "npm run check:web && npm --prefix apps/agent run check",
-    "test": "npm --prefix apps/web test && npm --prefix apps/agent test",
-    "setup": "npm ci && npm --prefix apps/agent ci",
-    "dev": "npm --prefix apps/web exec --offline -- concurrently -k \"npm start\" \"npm --prefix apps/agent run dev\"",
-    "backend:local": "npm --prefix apps/agent run db:migrate && npm --prefix apps/agent run dev",
+    "check:api": "npm --prefix apps/api run check",
+    "check": "npm run check:web && npm run check:api",
+    "test": "npm --prefix apps/web test",
+    "setup:api": "npm --prefix apps/api ci",
+    "setup": "npm ci && npm run setup:api",
+    "dev": "npm --prefix apps/web exec --offline -- concurrently -k \"npm start\" \"npm run dev:api\"",
+    "dev:api": "npm --prefix apps/api run dev",
+    "build:api": "npm --prefix apps/api run build",
+    "start:api": "npm --prefix apps/api start",
+    "db:migrate": "npm --prefix apps/api run db:migrate",
+    "backend:local": "npm run db:migrate && npm run dev:api",
     "backend:tunnel": "cloudflared tunnel --url http://localhost:8787 --protocol http2"
   }
 }

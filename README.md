@@ -1,16 +1,16 @@
 # AI Travel Planner / wolves-web
 
 Планировщик поездок. React-приложение на BroJS находится в `apps/web/`,
-Express API находится в `apps/agent/`.
+API на Hono находится в `apps/api/`.
 
 ## Локальный бэк
 
 Нужны Node.js 22+ и запущенный PostgreSQL.
 Установи оба приложения через `npm run setup`. Если нужен только API, используй
-`npm --prefix apps/agent ci`. Скопируй `apps/agent/.env.example` в `apps/agent/.env`
+`npm run setup:api`. Скопируй `apps/api/.env.example` в `apps/api/.env`
 и задай `DATABASE_URL` и `AUTH_SECRET`. Секрет можно получить командой
-`openssl rand -hex 32`. Если обновляешь старый локальный клон, перенеси свой
-`agent/.env` в `apps/agent/.env`: Git не переносит этот файл.
+`openssl rand -hex 32`. Если API уже работал, сохрани прежний `AUTH_SECRET`,
+чтобы не сбросить сессии.
 Для базы через Docker есть команда `docker compose up -d db`.
 
 ```bash
@@ -22,30 +22,30 @@ npm run backend:tunnel   # в другом терминале, нужен cloudf
 Если API уже запущен, для фронта достаточно `npm start`.
 
 Для продового фронта задай `FRONTEND_URL`, `AUTH_CROSS_SITE_COOKIES=1`
-и `TRUST_PROXY=1` в `apps/agent/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
+и `TRUST_PROXY=1` в `apps/api/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
 После перезапуска туннеля адрес меняется. Для AI нужен `OPENROUTER_API_KEY`
-или `LLM_API_KEY` в `apps/agent/.env`.
+или `LLM_API_KEY` в `apps/api/.env`.
 
 ## Дополнительные интеграции
 
 | Возможность | Настройка |
 |---|---|
-| AI | `OPENROUTER_API_KEY`, при необходимости `OPENROUTER_MODEL` в `apps/agent/.env` |
-| Другой LLM-провайдер | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` в `apps/agent/.env` |
-| Поиск места по адресу | `GOOGLE_MAPS_API_KEY` в `apps/agent/.env`; без ключа можно ввести координаты вручную |
+| AI | `OPENROUTER_API_KEY`, при необходимости `OPENROUTER_MODEL` в `apps/api/.env` |
+| Другой LLM-провайдер | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` в `apps/api/.env` |
+| Поиск места по адресу | `GOOGLE_MAPS_API_KEY` в `apps/api/.env`; без ключа можно ввести координаты вручную |
 | Отображение карты | `wolves-web.google-maps-key` в конфигурации BroJS; локально `GOOGLE_MAPS_PUBLIC_KEY=... npm run dev` |
-| Изображения | URL картинки в форме; загрузка файла требует `UPLOADTHING_TOKEN` в `apps/agent/.env` |
+| Изображения | URL картинки в форме; загрузка файла требует `UPLOADTHING_TOKEN` в `apps/api/.env` |
 | OAuth | Пары `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, аналогично для Facebook и Apple |
 
 OAuth-кнопки появляются только для настроенных провайдеров. Callback для Google
 локально: `http://localhost:8787/api/auth/callback/google` (для остальных меняется
-последний сегмент). Используется Auth.js для Express, с JWT-сессией в HttpOnly-cookie.
+последний сегмент). Hono передаёт запросы Auth.js. JWT-сессия хранится в HttpOnly-cookie.
 
 ## Структура
 
 ```text
 apps/web/             # BroJS, React, Tailwind, HTTP-клиент и заглушки API
-apps/agent/           # Express, Prisma, авторизация и AI
+apps/api/             # Hono, Prisma, авторизация, поездки, загрузка и AI
 scripts/build-web.cjs # сборка фронта и перенос результата в корневой dist/
 package.json          # команды для Jenkins и локальной разработки
 compose.yaml          # локальный PostgreSQL
@@ -54,21 +54,21 @@ compose.yaml          # локальный PostgreSQL
 У приложений свои `package.json`, `package-lock.json` и `node_modules`.
 Мы не используем npm workspaces: dev-сервер BroJS ищет `@brojs/fire.app`
 в `node_modules` рабочей папки. Prisma и ключи провайдеров нужны только API.
-Даты передаются через HTTP как ISO-строки.
+Даты передаются через HTTP как ISO-строки. Новые миграции добавляем в
+`apps/api/prisma/`.
 
 ## Проверки и сборка
 
 ```bash
 npm run check                   # форматирование, lint, типы фронта и API
-npm test                        # тесты HTTP-клиента, API, Auth.js, AI-промптов и JSON
+npm test                        # тесты фронта
 npm run build:prod              # production BroJS-бандл в dist/
-npm --prefix apps/agent run build # сборка API в apps/agent/dist/
-npm --prefix apps/agent start     # запуск собранного API
+npm run build:api               # сборка API в apps/api/dist/
+npm run start:api               # запуск собранного API
+npm run db:migrate              # применение миграций API
 ```
 
-Серверные тесты проверяют настоящий обмен Auth.js/CSRF/cookie, но подменяют Prisma
-и LLM: для них не нужны PostgreSQL и платные API. Вызовы Google, OAuth-провайдеров,
-UploadThing и LLM требуют соответствующих ключей и отдельной проверки с ними.
+Для вызовов Google, OAuth-провайдеров, UploadThing и LLM нужны соответствующие ключи.
 
 ## Размещение
 
@@ -105,7 +105,7 @@ test -s dist/index.js
 За одним доверенным прокси задайте `TRUST_PROXY=1` и при необходимости `AUTH_URL`
 с публичным адресом `/api/auth`. HTTP deep links должны возвращать оболочку BroJS.
 
-Для HTTPS-туннеля включите `AUTH_CROSS_SITE_COOKIES=1` в `apps/agent/.env`.
+Для HTTPS-туннеля включите `AUTH_CROSS_SITE_COOKIES=1` в `apps/api/.env`.
 Это включает cookie с `SameSite=None; Secure; Partitioned`.
 Для постоянного размещения предпочтителен прокси на домене фронта.
 

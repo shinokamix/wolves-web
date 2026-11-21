@@ -6,30 +6,21 @@ const RATE_LIMIT_MAX_REQUESTS = 10;
 
 const hits = new Map<string, number[]>();
 
-function getClientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim();
-  }
-  return "unknown";
-}
-
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterMs?: number;
 }
 
-export function checkRateLimit(req: Request): RateLimitResult {
-  const ip = getClientIp(req);
+export function checkRateLimit(key: string): RateLimitResult {
   const now = Date.now();
 
-  const timestamps = hits.get(ip) ?? [];
+  const timestamps = hits.get(key) ?? [];
 
   // Purge entries outside the window
   const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
   valid.push(now);
-  hits.set(ip, valid);
+  hits.set(key, valid);
 
   // Periodically prune stale IPs to prevent unbounded growth
   if (hits.size > 10_000) {

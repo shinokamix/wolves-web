@@ -1,15 +1,16 @@
 # AI Travel Planner / wolves-web
 
-Простой перенос `ai-travel-planner` на BroJS: React 18 SPA в корне, Express API
-в `agent/`. Next.js больше не нужен. Сохранены страницы и Tailwind-стили исходника,
-поездки, локации, карта, глобус, AI, публичная ссылка и печать.
+Планировщик поездок. React-приложение на BroJS находится в `apps/web/`,
+Express API находится в `apps/agent/`.
 
 ## Локальный бэк
 
 Нужны Node.js 22+ и запущенный PostgreSQL.
-При первом запуске установи зависимости через `npm --prefix agent ci`,
-скопируй `agent/.env.example` в `agent/.env` и задай `DATABASE_URL` и `AUTH_SECRET`.
-Секрет можно получить командой `openssl rand -hex 32`.
+Установи оба приложения через `npm run setup`. Если нужен только API, используй
+`npm --prefix apps/agent ci`. Скопируй `apps/agent/.env.example` в `apps/agent/.env`
+и задай `DATABASE_URL` и `AUTH_SECRET`. Секрет можно получить командой
+`openssl rand -hex 32`. Если обновляешь старый локальный клон, перенеси свой
+`agent/.env` в `apps/agent/.env`: Git не переносит этот файл.
 Для базы через Docker есть команда `docker compose up -d db`.
 
 ```bash
@@ -17,20 +18,23 @@ npm run backend:local    # миграции и API на порту 8787
 npm run backend:tunnel   # в другом терминале, нужен cloudflared
 ```
 
+После миграций `npm run dev` запускает фронт на порту 8099 и API на порту 8787.
+Если API уже запущен, для фронта достаточно `npm start`.
+
 Для продового фронта задай `FRONTEND_URL`, `AUTH_CROSS_SITE_COOKIES=1`
-и `TRUST_PROXY=1` в `agent/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
+и `TRUST_PROXY=1` в `apps/agent/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
 После перезапуска туннеля адрес меняется. Для AI нужен `OPENROUTER_API_KEY`
-или `LLM_API_KEY` в `agent/.env`.
+или `LLM_API_KEY` в `apps/agent/.env`.
 
 ## Дополнительные интеграции
 
 | Возможность | Настройка |
 |---|---|
-| AI | `OPENROUTER_API_KEY`, при необходимости `OPENROUTER_MODEL` в `agent/.env` |
-| Другой LLM-провайдер | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` в `agent/.env` |
-| Поиск места по адресу | `GOOGLE_MAPS_API_KEY` в `agent/.env`; без ключа можно ввести координаты вручную |
+| AI | `OPENROUTER_API_KEY`, при необходимости `OPENROUTER_MODEL` в `apps/agent/.env` |
+| Другой LLM-провайдер | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` в `apps/agent/.env` |
+| Поиск места по адресу | `GOOGLE_MAPS_API_KEY` в `apps/agent/.env`; без ключа можно ввести координаты вручную |
 | Отображение карты | `wolves-web.google-maps-key` в конфигурации BroJS; локально `GOOGLE_MAPS_PUBLIC_KEY=... npm run dev` |
-| Изображения | URL картинки в форме; загрузка файла требует `UPLOADTHING_TOKEN` в `agent/.env` |
+| Изображения | URL картинки в форме; загрузка файла требует `UPLOADTHING_TOKEN` в `apps/agent/.env` |
 | OAuth | Пары `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, аналогично для Facebook и Apple |
 
 OAuth-кнопки появляются только для настроенных провайдеров. Callback для Google
@@ -40,23 +44,17 @@ OAuth-кнопки появляются только для настроенны
 ## Структура
 
 ```text
-src/
-  app.tsx          # маршруты и общая оболочка
-  pages/           # экраны
-  components/      # компоненты исходника и UI-примитивы
-  api/             # HTTP-клиент, авторизация, поездки, типы, сессия
-  lib/             # небольшие вспомогательные функции
-  styles.css       # Tailwind и стили исходника
-agent/
-  src/             # Express, авторизация, поездки, AI, загрузка
-  prisma/          # исходная PostgreSQL-схема и миграции
-  tests/           # HTTP-контракт и серверные проверки
+apps/web/             # BroJS, React, Tailwind, HTTP-клиент и заглушки API
+apps/agent/           # Express, Prisma, авторизация и AI
+scripts/build-web.cjs # сборка фронта и перенос результата в корневой dist/
+package.json          # команды для Jenkins и локальной разработки
+compose.yaml          # локальный PostgreSQL
 ```
 
-`agent/` — самостоятельный пакет со своим lock-файлом и зависимостями,
-без npm workspaces. Prisma и ключи провайдеров используются только сервером.
-Даты передаются через API как ISO-строки. CSS генерируется перед запуском/сборкой
-и обновляется в watch-режиме при разработке.
+У приложений свои `package.json`, `package-lock.json` и `node_modules`.
+Мы не используем npm workspaces: dev-сервер BroJS ищет `@brojs/fire.app`
+в `node_modules` рабочей папки. Prisma и ключи провайдеров нужны только API.
+Даты передаются через HTTP как ISO-строки.
 
 ## Проверки и сборка
 
@@ -64,8 +62,8 @@ agent/
 npm run check                   # форматирование, lint, типы фронта и API
 npm test                        # тесты HTTP-клиента, API, Auth.js, AI-промптов и JSON
 npm run build:prod              # production BroJS-бандл в dist/
-npm --prefix agent run build    # сборка API в agent/dist/
-npm --prefix agent start        # запуск собранного API
+npm --prefix apps/agent run build # сборка API в apps/agent/dist/
+npm --prefix apps/agent start     # запуск собранного API
 ```
 
 Серверные тесты проверяют настоящий обмен Auth.js/CSRF/cookie, но подменяют Prisma
@@ -73,6 +71,25 @@ npm --prefix agent start        # запуск собранного API
 UploadThing и LLM требуют соответствующих ключей и отдельной проверки с ними.
 
 ## Размещение
+
+### Контракт с Jenkins
+
+Пайплайн запускает из корня следующие команды. Настройки Jenkins менять не нужно.
+
+```bash
+npm ci --progress=false --loglevel=error --fetch-retries=3
+VERSION=main npm run build:prod
+test -s dist/index.js
+```
+
+Корневой `npm ci` через `postinstall` устанавливает только фронт из его lock-файла.
+Сборка запускает BroJS из `apps/web/`, очищает старый корневой `dist/` и копирует
+туда новый бандл после проверки `index.js`. Jenkins, как и раньше, забирает
+файлы из корневого `dist/` и публикует их в `wolves-web/main` для ветки `main`.
+Если собрать фронт напрямую через `npm --prefix apps/web run build:prod`,
+результат останется в `apps/web/dist/`.
+
+### Настройки BroJS и API
 
 Фронт размещается через BroJS с именем `wolves-web` и версией в `publicPath`.
 Для API нужен отдельный Node.js-процесс. В админке BroJS задаются:
@@ -88,7 +105,7 @@ UploadThing и LLM требуют соответствующих ключей и
 За одним доверенным прокси задайте `TRUST_PROXY=1` и при необходимости `AUTH_URL`
 с публичным адресом `/api/auth`. HTTP deep links должны возвращать оболочку BroJS.
 
-Для HTTPS-туннеля включите `AUTH_CROSS_SITE_COOKIES=1` в `agent/.env`.
+Для HTTPS-туннеля включите `AUTH_CROSS_SITE_COOKIES=1` в `apps/agent/.env`.
 Это включает cookie с `SameSite=None; Secure; Partitioned`.
 Для постоянного размещения предпочтителен прокси на домене фронта.
 

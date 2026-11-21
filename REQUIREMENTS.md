@@ -28,8 +28,8 @@
 | 3.3 | CSS-in-JS / UI-kit (например, emotion) | ❌ |
 | 3.4 | Архитектура brojs: | |
 | 3.4.1 | — версионирование: версия в `publicPath` (`/static/<name>/<version>/`) | 🟡 версия `0.0.0` |
-| 3.4.2 | — фича-тогглы: `features` в `bro.config.js`, в коде `getFeatureValue()` из `@brojs/cli` | ❌ |
-| 3.4.3 | — конфигурация: `config` / `navigations` в `bro.config.js`, в коде `getConfigValue()` / `getNavigationValue()` | 🟡 в коде не используется |
+| 3.4.2 | — фича-тогглы: `features` в `apps/web/bro.config.js`, в коде `getFeatureValue()` из `@brojs/cli` | ❌ |
+| 3.4.3 | — конфигурация: `config` / `navigations` в `apps/web/bro.config.js`, в коде `getConfigValue()` / `getNavigationValue()` | 🟡 в коде не используется |
 
 ## 4. Технические требования
 
@@ -51,38 +51,23 @@ Claude Code, Antigravity, Codex, OpenCode, GigaCode.
 # Архитектура
 
 ```
-wolves-web/                  ← репозиторий
-├── package.json             ← фронт (brojs) + общие скрипты dev / check
-├── src/, bro.config.js …    ← фронт (brojs-микрофронт), деплой через админку brojs
-├── agent/                   ← бэкенд AI-агента (Node + TypeScript + LangGraph.js)
-│   ├── package.json         ← свой, со своим package-lock.json
-│   ├── tsconfig.json        ← свой
-│   └── src/
-└── .github/workflows/       ← CI: отдельные job для фронта и агента
+wolves-web/
+├── apps/
+│   ├── web/                ← BroJS и React
+│   └── agent/              ← Express, TypeScript и Prisma
+├── scripts/build-web.cjs   ← подготовка фронтовых файлов для Jenkins
+└── package.json            ← корневые команды Jenkins и разработки
 ```
 
-**Почему так, а не `apps/web` + `apps/agent` на npm workspaces** (проверено на копии):
+Приложения устанавливаются независимо, без npm workspaces. BroJS ищет
+`@brojs/fire.app`, `bro.config.js` и `package.json` в рабочей папке. После
+подъёма зависимостей в корень dev-сервер не находил `fire.app`.
 
-- dev-сервер brojs ищет `fire.app` по жёсткому пути `path.resolve('node_modules', '@brojs/fire.app', …)`
-  от папки запуска; так же через `path.resolve(...)` читаются `bro.config.js`, `package.json` и `dist`.
-  В workspaces зависимости поднимаются в корневой `node_modules` → страница отдаёт 500,
-  `fire.app` — 404. `install-strategy=nested` тоже не помогает.
-- Админка brojs деплоит по ссылке на репозиторий и, скорее всего, ждёт проект в корне;
-  от `name` и `version` корневого `package.json` зависит `publicPath`.
-
-**Правила:**
-
-- `agent/` — **не** workspace: свой `package.json`, свой lock, свой `node_modules`.
-  Зависимости агента (LangChain и т.д.) не попадают во фронт.
-- Корневой `tsconfig.json` ограничен фронтом: `"include": ["src"]` и `"rootDir": "."` (вместо `"./src"`).
-  Без `include` `tsc` подхватывает `agent/**` и падает с `TS6059` (файл вне `rootDir`);
-  с `rootDir: "./src"` падает импорт типов контракта из `agent/`.
-- Корневые `lint` / `format` уже смотрят только в `src`, агента не трогают.
-- Общие команды в корневом `package.json`:
-  - `check` — проверки фронта + `npm --prefix agent run check`;
-  - `dev` — фронт и агент вместе (например, через `concurrently`).
-- Типы HTTP-контракта `/chat` живут в `agent/src/contract.ts`; фронт импортирует их по
-  относительному пути (`import type`), без отдельного пакета.
+- Корневой `npm ci` устанавливает только `apps/web`. `npm run build:prod`
+  запускает BroJS из `apps/web` и готовит корневой `dist/` для публикации Jenkins.
+- `npm run setup` устанавливает оба приложения. `npm run check` и `npm test`
+  проверяют оба пакета, а `npm run dev` запускает их вместе.
+- Приложения общаются по HTTP и не импортируют код друг друга.
 
 ## Фронт
 
@@ -91,7 +76,7 @@ wolves-web/                  ← репозиторий
   `config: { "wolves-web.agent": "http://localhost:8787" }` → `getConfigValue("wolves-web.agent")`.
 - Фича-тоггл агента: `features: { "wolves-web": { "ai-agent": { value: "true" } } }`.
 
-## AI-агент (`agent/`)
+## AI-агент (`apps/agent/`)
 
 - **Стек:** Node, TypeScript, LangGraph.js. При необходимости переписывается на Python —
   фронт об этом не узнает, если сохранить HTTP-контракт.
@@ -117,8 +102,8 @@ wolves-web/                  ← репозиторий
 
 ## CI/CD
 
-- **CI (GitHub Actions)** на каждый PR и пуш в `main`:
-  `npm ci` → `npm run check` → тесты → `npm run build:prod`; для `agent/` — свой линт, типы и тесты.
+- План для CI на PR: проверять сборку фронта командами Jenkins и независимо
+  запускать проверку типов и тесты для `apps/agent/`.
 - **CD:** фронт деплоит админка brojs; агент — отдельно, по выбранному хостингу.
 
 ---

@@ -2,9 +2,6 @@ node_modules
 dist
 .env
 .brojs
-agent/node_modules
-agent/dist
-agent/.env
-src/generated
+apps/web/src/generated/
 coverage
 *.tsbuildinfo

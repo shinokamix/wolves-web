@@ -59,14 +59,14 @@ wolves-web/
 └── package.json            ← корневые команды Jenkins и разработки
 ```
 
-Приложения устанавливаются независимо, без npm workspaces. BroJS ищет
-`@brojs/fire.app`, `bro.config.js` и `package.json` в рабочей папке. После
-подъёма зависимостей в корень dev-сервер не находил `fire.app`.
+Приложения используют npm workspaces и общий корневой `package-lock.json`.
+BroJS запускается из `apps/web`. Перед локальным стартом `prestart` добавляет
+ссылки на `@brojs/fire.app` и `@brojs/templates` туда, где dev-сервер их ищет.
 
-- Корневой `npm ci` устанавливает только `apps/web`. `npm run build:prod`
+- Корневой `npm ci` устанавливает оба приложения. `npm run build:prod`
   запускает BroJS из `apps/web` и готовит корневой `dist/` для публикации Jenkins.
-- `npm run setup` устанавливает фронт и новый API. `npm run check` проверяет
-  оба пакета, а `npm run dev` запускает их вместе. `npm test` запускает тесты фронта.
+- `npm run check` проверяет оба пакета, а `npm run dev` запускает их вместе.
+  `npm test` запускает тесты фронта.
 - Приложения общаются по HTTP и не импортируют код друг друга.
 
 ## Фронт

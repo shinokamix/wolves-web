@@ -3,13 +3,14 @@ const { cpSync, rmSync, statSync } = require('node:fs');
 const { resolve } = require('node:path');
 
 const root = resolve(__dirname, '..');
-const web = resolve(root, 'apps/web');
+const workspace = 'apps/web';
 const deployDir = resolve(root, 'dist');
-const buildDir = resolve(web, 'dist');
+const buildDir = resolve(root, workspace, 'dist');
 const command = process.argv[2];
 
 rmSync(deployDir, { recursive: true, force: true });
-const build = spawnSync(process.execPath, [process.env.npm_execpath, '--prefix', web, 'run', command], {
+const build = spawnSync(process.execPath, [process.env.npm_execpath, 'run', command, '--workspace', workspace], {
+  cwd: root,
   stdio: 'inherit',
 });
 if (build.error) throw build.error;

@@ -4,10 +4,11 @@
   "private": true,
   "main": "./src/index.tsx",
   "scripts": {
+    "prestart": "node scripts/link-brojs-dev-deps.cjs",
     "start": "npm run styles && concurrently -k \"npm run styles:watch\" \"brojs server --port=8099\"",
     "build": "npm run clean && npm run styles && brojs build --dev",
     "build:prod": "npm run clean && npm run styles && brojs build",
-    "clean": "rimraf dist",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "compile": "npm run styles && brojs compile",
     "prom": "npm run compile && brojs prom-server --port=8099",
     "lint": "oxlint --type-aware src",
@@ -44,6 +45,8 @@
     "@radix-ui/react-slot": "^1.2.4"
   },
   "devDependencies": {
+    "@brojs/fire.app": "^2.0.0",
+    "@brojs/templates": "^2.0.0",
     "oxfmt": "^0.75.0",
     "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
@@ -53,10 +56,5 @@
     "@tailwindcss/cli": "^4.3.3",
     "concurrently": "^9.2.1",
     "vitest": "^4.1.10"
-  },
-  "overrides": {
-    "react-i18next": {
-      "typescript": "$typescript"
-    }
   }
 }

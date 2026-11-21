@@ -5,21 +5,18 @@ API на Hono находится в `apps/api/`.
 
 ## Локальный бэк
 
-Нужны Node.js 22+ и запущенный PostgreSQL.
-Установи оба приложения через `npm run setup`. Если нужен только API, используй
-`npm run setup:api`. Скопируй `apps/api/.env.example` в `apps/api/.env`
-и задай `DATABASE_URL` и `AUTH_SECRET`. Секрет можно получить командой
+Нужны Node.js 22+ и запущенный PostgreSQL. Установи зависимости из корня
+через `npm ci`. Скопируй `apps/api/.env.example` в `apps/api/.env` и задай
+`DATABASE_URL` и `AUTH_SECRET`. Секрет можно получить командой
 `openssl rand -hex 32`. Если API уже работал, сохрани прежний `AUTH_SECRET`,
 чтобы не сбросить сессии.
 Для базы через Docker есть команда `docker compose up -d db`.
 
-```bash
-npm run backend:local    # миграции и API на порту 8787
-npm run backend:tunnel   # в другом терминале, нужен cloudflared
-```
-
-После миграций `npm run dev` запускает фронт на порту 8099 и API на порту 8787.
-Если API уже запущен, для фронта достаточно `npm start`.
+- Только API: `npm run backend:local` применяет миграции и запускает API на порту 8787.
+- Фронт и API: сначала `npm run db:migrate --workspace apps/api`, затем `npm run dev`.
+  Фронт откроется на порту 8099, API на 8787.
+- Если API уже запущен, для фронта достаточно `npm start`.
+- Для туннеля запусти `npm run backend:tunnel` в другом терминале. Нужен `cloudflared`.
 
 Для продового фронта задай `FRONTEND_URL`, `AUTH_CROSS_SITE_COOKIES=1`
 и `TRUST_PROXY=1` в `apps/api/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
@@ -51,22 +48,27 @@ package.json          # команды для Jenkins и локальной ра
 compose.yaml          # локальный PostgreSQL
 ```
 
-У приложений свои `package.json`, `package-lock.json` и `node_modules`.
-Мы не используем npm workspaces: dev-сервер BroJS ищет `@brojs/fire.app`
-в `node_modules` рабочей папки. Prisma и ключи провайдеров нужны только API.
+У каждого приложения свой `package.json`. npm workspaces использует один
+корневой `package-lock.json` для обоих. Перед локальным запуском `prestart`
+создаёт ссылки на `@brojs/fire.app` и `@brojs/templates` в
+`apps/web/node_modules`, где BroJS ищет эти пакеты. Production-сборке ссылки не нужны.
+У `react-i18next` внутри BroJS указана совместимость с TypeScript 5, а фронт
+использует TypeScript 7. Корневой `overrides` действует только на эту зависимость BroJS.
 Даты передаются через HTTP как ISO-строки. Новые миграции добавляем в
 `apps/api/prisma/`.
 
 ## Проверки и сборка
 
 ```bash
-npm run check                   # форматирование, lint, типы фронта и API
-npm test                        # тесты фронта
-npm run build:prod              # production BroJS-бандл в dist/
-npm run build:api               # сборка API в apps/api/dist/
-npm run start:api               # запуск собранного API
-npm run db:migrate              # применение миграций API
+npm run check                       # форматирование, lint, типы фронта и API
+npm test                            # тесты фронта
+npm run build:prod                  # production BroJS-бандл в dist/
+npm run build --workspace apps/api  # сборка API в apps/api/dist/
+npm run start --workspace apps/api  # запуск собранного API
 ```
+
+Команды одного приложения запускай в его workspace. Например,
+`npm run format --workspace apps/web` форматирует исходники фронта.
 
 Для вызовов Google, OAuth-провайдеров, UploadThing и LLM нужны соответствующие ключи.
 
@@ -74,7 +76,8 @@ npm run db:migrate              # применение миграций API
 
 ### Контракт с Jenkins
 
-Пайплайн запускает из корня следующие команды. Настройки Jenkins менять не нужно.
+Следующие команды проверяют сборку, которую Jenkins запускает из корня.
+Настройки Jenkins менять не нужно.
 
 ```bash
 npm ci --progress=false --loglevel=error --fetch-retries=3
@@ -82,12 +85,12 @@ VERSION=main npm run build:prod
 test -s dist/index.js
 ```
 
-Корневой `npm ci` через `postinstall` устанавливает только фронт из его lock-файла.
-Сборка запускает BroJS из `apps/web/`, очищает старый корневой `dist/` и копирует
-туда новый бандл после проверки `index.js`. Jenkins, как и раньше, забирает
-файлы из корневого `dist/` и публикует их в `wolves-web/main` для ветки `main`.
-Если собрать фронт напрямую через `npm --prefix apps/web run build:prod`,
-результат останется в `apps/web/dist/`.
+Корневой `npm ci` устанавливает оба пакета и генерирует Prisma Client.
+Он не запускает API и не применяет миграции. Корневая команда `build:prod`
+очищает старый `dist/`, собирает фронт в `apps/web/` и копирует бандл в корень
+после проверки `index.js`. Jenkins забирает файлы из корневого `dist/`
+и публикует их в `wolves-web/main` для ветки `main`.
+Команда `npm run build:prod --workspace apps/web` оставляет файлы в `apps/web/dist/`.
 
 ### Настройки BroJS и API
 

@@ -1,34 +1,32 @@
 {
-  "name": "wolves-web",
+  "name": "wolves-web-monorepo",
   "version": "0.0.0",
   "private": true,
+  "workspaces": ["apps/web", "apps/api"],
   "scripts": {
-    "postinstall": "npm --prefix apps/web ci",
-    "start": "npm --prefix apps/web start",
+    "start": "npm run start --workspace apps/web",
     "build": "node scripts/build-web.cjs build",
     "build:prod": "node scripts/build-web.cjs build:prod",
     "clean": "node scripts/build-web.cjs clean",
-    "compile": "npm --prefix apps/web run compile",
-    "prom": "npm --prefix apps/web run prom",
-    "lint": "npm --prefix apps/web run lint",
-    "lint:fix": "npm --prefix apps/web run lint:fix",
-    "typecheck": "npm --prefix apps/web run typecheck",
-    "format": "npm --prefix apps/web run format",
-    "format:check": "npm --prefix apps/web run format:check",
-    "styles": "npm --prefix apps/web run styles",
-    "styles:watch": "npm --prefix apps/web run styles:watch",
-    "check:web": "npm --prefix apps/web run check",
-    "check:api": "npm --prefix apps/api run check",
-    "check": "npm run check:web && npm run check:api",
-    "test": "npm --prefix apps/web test",
-    "setup:api": "npm --prefix apps/api ci",
-    "setup": "npm ci && npm run setup:api",
-    "dev": "npm --prefix apps/web exec --offline -- concurrently -k \"npm start\" \"npm run dev:api\"",
-    "dev:api": "npm --prefix apps/api run dev",
-    "build:api": "npm --prefix apps/api run build",
-    "start:api": "npm --prefix apps/api start",
-    "db:migrate": "npm --prefix apps/api run db:migrate",
-    "backend:local": "npm run db:migrate && npm run dev:api",
+    "compile": "npm run compile --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "format:check": "npm run format:check --workspace apps/web",
+    "styles": "npm run styles --workspace apps/web",
+    "check": "npm run check --workspaces",
+    "test": "npm run test --workspace apps/web",
+    "dev": "concurrently -k \"npm start\" \"npm run dev --workspace apps/api\"",
+    "backend:local": "npm run db:migrate --workspace apps/api && npm run dev --workspace apps/api",
     "backend:tunnel": "cloudflared tunnel --url http://localhost:8787 --protocol http2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "@brojs/i18nextreactconfig": {
+      "react-i18next": {
+        "typescript": "^7.0.2"
+      }
+    }
   }
 }

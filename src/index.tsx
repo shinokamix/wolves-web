@@ -7,19 +7,23 @@ import App from './app';
 
 export default () => <App />;
 
-let rootElement: ReactDOM.Root;
+let rootElement: ReactDOM.Root | undefined;
 
-export const mount = (Component, element = document.getElementById('app')!) => {
+export const mount = (
+  Component: React.ComponentType,
+  element = document.getElementById('app')!,
+) => {
   rootElement = ReactDOM.createRoot(element);
   rootElement.render(<Component />);
 
   if (module.hot) {
     module.hot.accept('./app', () => {
-      rootElement.render(<Component />);
+      rootElement?.render(<Component />);
     });
   }
 };
 
 export const unmount = () => {
-  rootElement.unmount();
+  rootElement?.unmount();
+  rootElement = undefined;
 };

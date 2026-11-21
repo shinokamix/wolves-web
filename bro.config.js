@@ -1,24 +1,18 @@
-const pkg = require("./package");
+const path = require('node:path');
+const pkg = require('./package');
 
 module.exports = {
-  apiPath: "stubs/api",
+  apiPath: 'stubs/api',
   webpackConfig: {
-    output: {
-      publicPath: `/static/${pkg.name}/${process.env.VERSION || pkg.version}/`,
-    },
+    output: { publicPath: `/static/${pkg.name}/${process.env.VERSION || pkg.version}/` },
+    resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   },
-  /* use https://admin.bro-js.ru/ to create config, navigations and features */
-  navigations: {
-    "wolves-web.main": "/wolves-web",
-  },
-  features: {
-    "wolves-web": {
-      // add your features here in the format [featureName]: { value: string }
-    },
-  },
+  navigations: { 'wolves-web.main': '/wolves-web' },
+  features: { 'wolves-web': {} },
   config: {
-    "wolves-web.api": "/api",
+    'wolves-web.api': '/api',
+    'wolves-web.agent': process.env.AGENT_URL || 'http://localhost:8787',
+    'wolves-web.google-maps-key': process.env.GOOGLE_MAPS_PUBLIC_KEY || '',
   },
-  // Укажите путь к кастомному HTML-шаблону для prom-режима или оставьте undefined
   htmlTemplatePath: undefined,
 };

@@ -42,6 +42,50 @@ beforeEach(() => {
 });
 
 describe('Express travel API', () => {
+  it('supports HTTPS cross-site login cookies while keeping CSRF validation', async () => {
+    vi.stubEnv('AUTH_CROSS_SITE_COOKIES', '1');
+    vi.stubEnv('TRUST_PROXY', '1');
+    vi.stubEnv('FRONTEND_URL', 'https://frontend.example/wolves-web');
+    try {
+      const crossSiteApp = createApp();
+      const send = () => supertest(crossSiteApp);
+      const csrf = await send().get('/api/auth/csrf').set('X-Forwarded-Proto', 'https');
+      const cookies = csrf.headers['set-cookie'] as unknown as string[];
+      expect(cookies.some((cookie) => cookie.startsWith('__Host-authjs.csrf-token='))).toBe(true);
+      for (const cookie of cookies) {
+        expect(cookie).toContain('Secure');
+        expect(cookie).toContain('HttpOnly');
+        expect(cookie).toContain('SameSite=None');
+        expect(cookie).toContain('Partitioned');
+      }
+      const login = () => send().post('/api/auth/callback/credentials')
+        .set('Origin', 'https://frontend.example')
+        .set('X-Forwarded-Proto', 'https')
+        .set('X-Auth-Return-Redirect', '1')
+        .type('form');
+      const values = { csrfToken: csrf.body.csrfToken, identifier: user.email, password: 'test-password', callbackUrl: 'https://frontend.example/wolves-web/trips' };
+      const rejected = await login().send(values);
+      expect(rejected.body.url).toContain('error=MissingCSRF');
+      expect(db.user.findFirst).not.toHaveBeenCalled();
+      const result = await login().set('Cookie', cookies.map((cookie) => cookie.split(';')[0]).join('; ')).send(values);
+      expect(result.status).toBe(200);
+      expect(result.body.url).toBe(values.callbackUrl);
+      const sessionCookies = (result.headers['set-cookie'] as unknown as string[])
+        .filter((cookie) => cookie.startsWith('__Secure-authjs.session-token='));
+      expect(sessionCookies).toHaveLength(1);
+      expect(sessionCookies[0]).toContain('SameSite=None');
+      expect(sessionCookies[0]).toContain('Secure');
+      expect(sessionCookies[0]).toContain('Partitioned');
+      const session = await send().get('/api/auth/session').set('X-Forwarded-Proto', 'https')
+        .set('Cookie', sessionCookies.map((cookie) => cookie.split(';')[0]).join('; '));
+      expect(session.body.user.id).toBe(user.id);
+      const trips = await send().get('/api/trips').set('X-Forwarded-Proto', 'https')
+        .set('Cookie', sessionCookies.map((cookie) => cookie.split(';')[0]).join('; '));
+      expect(trips.status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('serves health and real Auth.js cookie sessions', async () => {
     expect((await supertest(app).get('/health')).body).toEqual({ ok: true });
     const response = await signedIn.get('/api/auth/session');

@@ -9,6 +9,8 @@ import type { Request } from 'express';
 import { prisma } from './prisma.js';
 
 export function createAuthConfig(frontendUrl: string): ExpressAuthConfig {
+  const crossSiteCookies = process.env.AUTH_CROSS_SITE_COOKIES === '1';
+  const cookieOptions = { httpOnly: true, secure: true, sameSite: 'none' as const, partitioned: true, path: '/' };
   const providers: ExpressAuthConfig['providers'] = [Credentials({
     credentials: { identifier: {}, password: {} },
     async authorize(credentials) {
@@ -25,6 +27,14 @@ export function createAuthConfig(frontendUrl: string): ExpressAuthConfig {
   return {
     adapter: PrismaAdapter(prisma), providers, secret: process.env.AUTH_SECRET,
     trustHost: true, basePath: '/api/auth', session: { strategy: 'jwt' },
+    ...(crossSiteCookies ? {
+      useSecureCookies: true,
+      cookies: {
+        csrfToken: { name: '__Host-authjs.csrf-token', options: cookieOptions },
+        sessionToken: { name: '__Secure-authjs.session-token', options: cookieOptions },
+        callbackUrl: { name: '__Secure-authjs.callback-url', options: cookieOptions },
+      },
+    } : {}),
     pages: { signIn: `${frontendUrl}/login`, error: `${frontendUrl}/login` },
     callbacks: {
       jwt({ token, user }) { if (user) token.id = user.id; return token; },

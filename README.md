@@ -4,30 +4,23 @@
 в `agent/`. Next.js больше не нужен. Сохранены страницы и Tailwind-стили исходника,
 поездки, локации, карта, глобус, AI, публичная ссылка и печать.
 
-## Первый запуск
+## Локальный бэк
 
-Нужны Node.js 22+ и PostgreSQL. Команды выполняются из `main/`.
-
-```bash
-npm run setup
-cp agent/.env.example agent/.env
-```
-
-В `agent/.env` задайте `DATABASE_URL` и `AUTH_SECRET` (случайная строка от 32 символов;
-сгенерировать: `openssl rand -hex 32`). Для локальной базы есть `compose.yaml`:
+Нужны Node.js 22+ и запущенный PostgreSQL.
+При первом запуске установи зависимости через `npm --prefix agent ci`,
+скопируй `agent/.env.example` в `agent/.env` и задай `DATABASE_URL` и `AUTH_SECRET`.
+Секрет можно получить командой `openssl rand -hex 32`.
+Для базы через Docker есть команда `docker compose up -d db`.
 
 ```bash
-docker compose up -d db
-npm --prefix agent run db:migrate
-npm run dev
+npm run backend:local    # миграции и API на порту 8787
+npm run backend:tunnel   # в другом терминале, нужен cloudflared
 ```
 
-Фронт: http://localhost:8099/wolves-web. API: http://localhost:8787, проверка запуска:
-http://localhost:8787/health. Регистрация по email работает без OAuth.
-`npm start` запускает только фронт, `npm --prefix agent run dev` — только API.
-
-Для существующей базы укажите её `DATABASE_URL`: схема и история миграций сохранены
-из исходника. Файлы конфигурации с секретами не коммитятся.
+Для продового фронта задай `FRONTEND_URL`, `AUTH_CROSS_SITE_COOKIES=1`
+и `TRUST_PROXY=1` в `agent/.env`. Адрес туннеля укажи в `wolves-web.agent` в BroJS.
+После перезапуска туннеля адрес меняется. Для AI нужен `OPENROUTER_API_KEY`
+или `LLM_API_KEY` в `agent/.env`.
 
 ## Дополнительные интеграции
 
@@ -94,6 +87,10 @@ UploadThing и LLM требуют соответствующих ключей и
 Прокси должен снимать этот префикс, передавать cookie и не буферизовать AI-стрим.
 За одним доверенным прокси задайте `TRUST_PROXY=1` и при необходимости `AUTH_URL`
 с публичным адресом `/api/auth`. HTTP deep links должны возвращать оболочку BroJS.
+
+Для HTTPS-туннеля включите `AUTH_CROSS_SITE_COOKIES=1` в `agent/.env`.
+Это включает cookie с `SameSite=None; Secure; Partitioned`.
+Для постоянного размещения предпочтителен прокси на домене фронта.
 
 ## Следующий этап
 
